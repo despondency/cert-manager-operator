@@ -20,9 +20,8 @@ import (
 	"context"
 
 	"github.com/despondency/cert-manager-operator/internal/cert"
-	v1 "k8s.io/api/core/v1"
+	v1core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -52,19 +51,26 @@ type CertificateReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
 func (r *CertificateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := logf.FromContext(ctx)
-	c := certsk8ciov1.Certificate{}
-	if err := r.Get(ctx, req.NamespacedName, &c); err != nil {
+	c := &certsk8ciov1.Certificate{}
+	if err := r.Get(ctx, req.NamespacedName, c); err != nil {
 		logger.Error(err, "unable to fetch Certificate")
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	// get the secretRef
-	s := &v1.Secret{}
+	s := &v1core.Secret{}
 	if err := r.Client.Get(ctx,
 		client.ObjectKey{
 			Namespace: req.Namespace,
 			Name:      c.Spec.SecretRef},
 		s); err != nil {
 		if errors.IsNotFound(err) {
+			// let's pretend that the cert provisioning "might take" more time than usual
+			// so we put this intermediate status
+			c.Status.Status = certsk8ciov1.StatusProvisioning
+			err := r.Status().Update(ctx, c)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
 			// if the secret is not found, we need to create it
 			// create the certificate
 			certDetails, err := cert.CreateCertificate(c.Spec.DNSName, c.Spec.Validity)
@@ -86,6 +92,10 @@ func (r *CertificateReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			}
 		}
 	}
+	// if secret is found
+	// check the validity of the certificate
+	// if the certificate is going to expire (based on some threshold)
+	// regenerate the cert + secret
 
 	return ctrl.Result{}, nil
 }
@@ -95,6 +105,6 @@ func (r *CertificateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&certsk8ciov1.Certificate{}).
 		Named("certificate").
-		Owns(&v1.Secret{}).
+		Owns(&v1core.Secret{}).
 		Complete(r)
 }

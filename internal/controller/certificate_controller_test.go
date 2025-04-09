@@ -51,6 +51,14 @@ var _ = Describe("Certificate Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+					Name:      "new-cert",
+					Namespace: "default",
+				}, resource)).To(Succeed())
+				g.Expect(resource.Status.Status).To(Equal(certsk8ciov1.StatusProvisioning))
+			}, timeout, interval).Should(Succeed())
+
 			certSecret := &v1.Secret{}
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{

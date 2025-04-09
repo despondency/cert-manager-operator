@@ -52,6 +52,9 @@ spec:
             type: object
           status:
             description: CertificateStatus defines the observed state of Certificate.
+            properties:
+              status:
+                type: string
             type: object
         type: object
     served: true

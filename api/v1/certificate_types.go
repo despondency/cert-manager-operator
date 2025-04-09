@@ -35,10 +35,15 @@ type CertificateSpec struct {
 	SecretRef string `json:"secretRef,omitempty"`
 }
 
+const (
+	StatusReady        = "Ready"
+	StatusProvisioning = "Provisioning"
+	StatusFailed       = "FailedProvisioning"
+)
+
 // CertificateStatus defines the observed state of Certificate.
 type CertificateStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Status string `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
