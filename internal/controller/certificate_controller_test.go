@@ -22,17 +22,16 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	c "sigs.k8s.io/controller-runtime/pkg/client"
 
 	certsk8ciov1 "github.com/despondency/cert-manager-operator/api/v1"
 )
 
 const (
 	timeout  = time.Second * 10
-	duration = time.Second * 10
-	interval = time.Millisecond * 250
+	interval = time.Second * 1
 )
 
 var _ = Describe("Certificate Controller", func() {
@@ -66,6 +65,20 @@ var _ = Describe("Certificate Controller", func() {
 					Namespace: "default",
 				}, certSecret)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
+
+			// Delete the parent resource (MyKind)
+			err := k8sClient.Delete(ctx, resource)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, c.ObjectKey{Name: "new-cert", Namespace: "default"}, resource)).To(Succeed())
+			}, timeout, interval).ShouldNot(Succeed())
+
+			Eventually(func(g Gomega) {
+				secret := &v1.Secret{}
+				g.Expect(k8sClient.Get(ctx, c.ObjectKey{Name: "certificate-secret", Namespace: "default"}, secret)).To(Succeed())
+			}, timeout, interval).ShouldNot(Succeed())
+
 		})
 	})
 })
