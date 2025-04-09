@@ -66,18 +66,17 @@ var _ = Describe("Certificate Controller", func() {
 				}, certSecret)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
 
-			// Delete the parent resource (MyKind)
+			// Delete the parent resource
 			err := k8sClient.Delete(ctx, resource)
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func(g Gomega) {
-				g.Expect(k8sClient.Get(ctx, c.ObjectKey{Name: "new-cert", Namespace: "default"}, resource)).To(Succeed())
-			}, timeout, interval).ShouldNot(Succeed())
+				g.Expect(k8sClient.Get(ctx, c.ObjectKey{Name: "new-cert", Namespace: "default"}, resource)).ToNot(Succeed())
+			}, timeout, interval).Should(Succeed())
 
 			Eventually(func(g Gomega) {
-				secret := &v1.Secret{}
-				g.Expect(k8sClient.Get(ctx, c.ObjectKey{Name: "certificate-secret", Namespace: "default"}, secret)).To(Succeed())
-			}, timeout, interval).ShouldNot(Succeed())
+				g.Expect(k8sClient.Get(ctx, c.ObjectKey{Name: "certificate-secret", Namespace: "default"}, certSecret)).ToNot(Succeed())
+			}, timeout, interval).Should(Succeed())
 
 		})
 	})
