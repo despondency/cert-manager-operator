@@ -24,10 +24,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/despondency/cert-manager-operator/test/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/despondency/cert-manager-operator/test/utils"
 )
 
 // namespace where the project is deployed in
@@ -254,6 +253,28 @@ var _ = Describe("Manager", Ordered, func() {
 			Expect(metricsOutput).To(ContainSubstring(
 				"controller_runtime_reconcile_total",
 			))
+		})
+
+		It("should be able to create a CR resource", func() {
+			// 4. Define the Certificate object.  This is the resource you want to create.
+			By("creating the CR resource for the Certificate")
+			verifyCRCreation := func(g Gomega) {
+				cmd := exec.Command("kubectl",
+					"apply",
+					"-f",
+					"config/samples/certs.k8c.io_v1_certificate.yaml")
+				o, err := cmd.CombinedOutput()
+				_ = o
+				g.Expect(err).NotTo(HaveOccurred())
+			}
+			Eventually(verifyCRCreation, 30*time.Second).Should(Succeed())
+			By("getting the secret with the Certificate")
+			verifySecretIsPresent := func(g Gomega) {
+				cmd := exec.Command("kubectl", "get", "secrets", "my-certificate-secret")
+				_, err := cmd.CombinedOutput()
+				g.Expect(err).NotTo(HaveOccurred())
+			}
+			Eventually(verifySecretIsPresent, 10*time.Second).Should(Succeed())
 		})
 
 		// +kubebuilder:scaffold:e2e-webhooks-checks

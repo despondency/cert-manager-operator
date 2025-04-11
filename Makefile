@@ -66,7 +66,7 @@ test: manifests generate fmt vet setup-envtest ## Run tests.
 # CertManager is installed by default; skip with:
 # - CERT_MANAGER_INSTALL_SKIP=true
 .PHONY: test-e2e
-test-e2e: manifests generate fmt vet ## Run the e2e tests. Expected an isolated environment using Kind.
+test-e2e: manifests generate fmt vet create-kind  ## Run the e2e tests. Expected an isolated environment using Kind.
 	@command -v $(KIND) >/dev/null 2>&1 || { \
 		echo "Kind is not installed. Please install Kind manually."; \
 		exit 1; \
@@ -158,12 +158,12 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 
 .PHONY: create-kind
 create-kind:
-	kind create cluster --name local
+	kind create cluster --name $(KIND)
 	kubectl apply -f ./config/crd/bases
 
 .PHONY: load-image
 load-image:
-	kind load docker-image controller:latest --name local
+	kind load docker-image controller:latest --name $(KIND)
 
 .PHONY: run-in-kind
 run-in-kind: manifests kustomize generate fmt vet create-kind docker-build load-image deploy
