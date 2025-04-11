@@ -6,10 +6,15 @@
 
 ## 📦 Overview
 
-**cert-manager-operator** is a Kubernetes operator that manages `Certificate` custom resources. 
+**cert-manager-operator** is a Kubernetes operator that manages `Certificate` custom resource. 
 It automates creation, updates, and lifecycle management within your cluster.
 
 ---
+## 📋 Future ideas
+- ⬜ Add a way to specify different certs (currently only RSA is possible, but ECDSA is a good alternative)
+- ⬜ Maybe add some "grace period" for instance, refresh every certificate 1 day earlier, rather than waiting for it to become expired
+- ⬜ Different output formats for the secret
+
 
 ## 📋 Features
 
@@ -32,6 +37,12 @@ It automates creation, updates, and lifecycle management within your cluster.
 - /api contains all the apis this operator manages (Certificate)
 - /config contains all the kustomize needed to deploy + samples
 - /test are all the e2e tests
+
+### 🧪 Running Tests
+```bash
+make test
+make e2e-test
+```
 
 ### 🧪 Running Locally
 
