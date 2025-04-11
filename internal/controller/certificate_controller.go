@@ -18,6 +18,11 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
+	"fmt"
+	"log"
 
 	"github.com/despondency/cert-manager-operator/internal/cert"
 	v1core "k8s.io/api/core/v1"
@@ -36,6 +41,14 @@ type CertificateReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
+
+const (
+	CACert      = "ca.crt"
+	TLSKey      = "tls.key"
+	TLSCert     = "tls.crt"
+	TLSCombined = "tls-combined.pem"
+	Key         = "key.der"
+)
 
 // +kubebuilder:rbac:groups=certs.k8c.io.despondency.io,resources=certificates,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=certs.k8c.io.despondency.io,resources=certificates/status,verbs=get;update;patch
@@ -56,44 +69,106 @@ func (r *CertificateReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			Name:      c.Spec.SecretRef},
 		s); err != nil {
 		if errors.IsNotFound(err) {
-			// let's pretend that the cert provisioning "might take" more time than usual
-			// so we put this intermediate status
-			c.Status.Status = certsk8ciov1.StatusProvisioning
-			err := r.Status().Update(ctx, c)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
 			// if the secret is not found, we need to create it
 			// create the certificate
-			certDetails, err := cert.CreateCertificate(c.Spec.DNSName, c.Spec.Validity)
+			err = r.createCertificate(ctx, c)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			s.Name = c.Spec.SecretRef
-			s.Namespace = req.Namespace
-			s.Data = map[string][]byte{
-				"ca.crt":           certDetails.CaCert,
-				"tls.key":          certDetails.TLSKey,
-				"tls.crt":          certDetails.TLSCert,
-				"tls-combined.pem": certDetails.TLSCombined,
-				"key.der":          certDetails.KeyBase64,
-			}
-			err = controllerutil.SetControllerReference(c, s, r.Scheme)
+		}
+	} else {
+		// if secret is found
+		// check the validity of the certificate
+		// regenerate the cert + secret
+		err := validateCertificate(s)
+		if err != nil {
+			// regenerate the certificate
+			err = r.Client.Delete(ctx, s)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			err = r.Client.Create(ctx, s)
+			err = r.createCertificate(ctx, c)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	}
-	// if secret is found
-	// check the validity of the certificate
-	// if the certificate is going to expire (based on some threshold)
-	// regenerate the cert + secret
 
 	return ctrl.Result{}, nil
+}
+
+func (r *CertificateReconciler) createCertificate(ctx context.Context,
+	c *certsk8ciov1.Certificate) error {
+	certSecret := &v1core.Secret{}
+	certDetails, err := cert.CreateCertificate(c.Spec.DNSName, c.Spec.Validity)
+	if err != nil {
+		return err
+	}
+	certSecret.Name = c.Spec.SecretRef
+	certSecret.Namespace = c.Namespace
+	certSecret.Data = map[string][]byte{
+		CACert:      certDetails.CaCert,
+		TLSKey:      certDetails.TLSKey,
+		TLSCert:     certDetails.TLSCert,
+		TLSCombined: certDetails.TLSCombined,
+		Key:         certDetails.KeyBase64,
+	}
+	err = controllerutil.SetControllerReference(c, certSecret, r.Scheme)
+	if err != nil {
+		return err
+	}
+	err = r.Client.Create(ctx, certSecret)
+	if err != nil {
+		return err
+	}
+	c.Status.Status = certsk8ciov1.StatusReady
+	err = r.Status().Update(ctx, c)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateCertificate(s *v1core.Secret) error {
+	caPEM, ok := s.Data[CACert]
+	if !ok {
+		return fmt.Errorf("secret %s/%s does not contain a certificate", s.Namespace, s.Name)
+	}
+	keyPEM, ok := s.Data[TLSKey]
+	if !ok {
+		return fmt.Errorf("secret %s/%s does not contain a certificate", s.Namespace, s.Name)
+	}
+	certPEM, ok := s.Data[TLSCert]
+	if !ok {
+		return fmt.Errorf("secret %s/%s does not contain a certificate", s.Namespace, s.Name)
+	}
+	// Parse certificate and key
+	_, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return fmt.Errorf("failed to parse certificate/key pair: %v", err)
+	}
+	// Load leaf certificate
+	block, _ := pem.Decode(certPEM)
+	if block == nil {
+		return fmt.Errorf("failed to decode PEM block from certificate")
+	}
+	leafCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse certificate: %v", err)
+	}
+	// Load CA cert pool
+	roots := x509.NewCertPool()
+	if ok := roots.AppendCertsFromPEM(caPEM); !ok {
+		log.Fatalf("failed to parse CA cert")
+	}
+	// Verify certificate
+	opts := x509.VerifyOptions{
+		Roots: roots,
+	}
+	if _, err := leafCert.Verify(opts); err != nil {
+		log.Fatalf("failed to verify certificate: %v", err)
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -26,19 +26,20 @@ import (
 // CertificateSpec defines the desired state of Certificate.
 type CertificateSpec struct {
 	// +kubebuilder:validation:Required
-	DNSName string `json:"dnsName,omitempty"`
+	// +kubebuilder:validation:Pattern=`^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$`
+	DNSName string `json:"dnsName"`
 
 	// +kubebuilder:validation:Required
-	Validity string `json:"validity,omitempty"`
+	// +kubebuilder:validation:Pattern=`\d+d`
+	Validity string `json:"validity"`
 
 	// +kubebuilder:validation:Required
-	SecretRef string `json:"secretRef,omitempty"`
+	SecretRef string `json:"secretRef"`
 }
 
 const (
-	StatusReady        = "Ready"
-	StatusProvisioning = "Provisioning"
-	StatusFailed       = "FailedProvisioning"
+	StatusReady  = "Ready"
+	StatusFailed = "Failed"
 )
 
 // CertificateStatus defines the observed state of Certificate.

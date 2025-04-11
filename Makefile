@@ -96,7 +96,7 @@ build: manifests generate fmt vet ## Build manager binary.
 	go build -o bin/manager cmd/main.go
 
 .PHONY: run
-run: manifests generate fmt vet ## Run a controller from your host.
+run: manifests generate fmt vet create-kind ## Run a controller from your host.
 	go run ./cmd/main.go
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
@@ -155,6 +155,19 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+
+.PHONY: create-kind
+create-kind:
+	kind create cluster --name local
+	kubectl apply -f ./config/crd/bases
+
+.PHONY: load-image
+load-image:
+	kind load docker-image controller:latest --name local
+
+.PHONY: run-in-kind
+run-in-kind: manifests kustomize generate fmt vet create-kind docker-build load-image deploy
+
 
 ##@ Dependencies
 

@@ -50,14 +50,6 @@ var _ = Describe("Certificate Controller", func() {
 			}
 			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 
-			Eventually(func(g Gomega) {
-				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
-					Name:      "new-cert",
-					Namespace: "default",
-				}, resource)).To(Succeed())
-				g.Expect(resource.Status.Status).To(Equal(certsk8ciov1.StatusProvisioning))
-			}, timeout, interval).Should(Succeed())
-
 			certSecret := &v1.Secret{}
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
@@ -66,16 +58,23 @@ var _ = Describe("Certificate Controller", func() {
 				}, certSecret)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
 
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+					Name:      "new-cert",
+					Namespace: "default",
+				}, resource)).To(Succeed())
+				g.Expect(resource.Status.Status).To(Equal(certsk8ciov1.StatusReady))
+			}, timeout, interval).Should(Succeed())
+
+			Expect(certSecret.OwnerReferences).To(HaveLen(1))
+			Expect(certSecret.OwnerReferences[0].Name).To(Equal("new-cert"))
+
 			// Delete the parent resource
 			err := k8sClient.Delete(ctx, resource)
 			Expect(err).NotTo(HaveOccurred())
 
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(ctx, c.ObjectKey{Name: "new-cert", Namespace: "default"}, resource)).ToNot(Succeed())
-			}, timeout, interval).Should(Succeed())
-
-			Eventually(func(g Gomega) {
-				g.Expect(k8sClient.Get(ctx, c.ObjectKey{Name: "certificate-secret", Namespace: "default"}, certSecret)).ToNot(Succeed())
 			}, timeout, interval).Should(Succeed())
 
 		})

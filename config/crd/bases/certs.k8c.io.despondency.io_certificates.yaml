@@ -40,10 +40,12 @@ spec:
             description: CertificateSpec defines the desired state of Certificate.
             properties:
               dnsName:
+                pattern: ^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$
                 type: string
               secretRef:
                 type: string
               validity:
+                pattern: \d+d
                 type: string
             required:
             - dnsName
