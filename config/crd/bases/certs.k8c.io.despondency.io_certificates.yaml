@@ -42,11 +42,17 @@ spec:
               dnsName:
                 pattern: ^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$
                 type: string
+                x-kubernetes-validations:
+                - message: dnsName is immutable
+                  rule: self == oldSelf
               secretRef:
                 type: string
               validity:
                 pattern: \d+d
                 type: string
+                x-kubernetes-validations:
+                - message: validity is immutable
+                  rule: self == oldSelf
             required:
             - dnsName
             - secretRef

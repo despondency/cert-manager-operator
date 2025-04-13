@@ -27,11 +27,13 @@ import (
 type CertificateSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=`^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$`
-	DNSName string `json:"dnsName"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="dnsName is immutable"
+	DNSName string `json:"dnsName"` // dnsName is immutable, since you cant change the domain of a certificate without regenerating it.
 
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=`\d+d`
-	Validity string `json:"validity"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="validity is immutable"
+	Validity string `json:"validity"` // validity is also immutable, since you cant change the validity period without regenerating
 
 	// +kubebuilder:validation:Required
 	SecretRef string `json:"secretRef"`
